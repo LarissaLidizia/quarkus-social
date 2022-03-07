@@ -5,12 +5,16 @@ import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import my.groudId.quarkussocial.domain.Repository.UserRepository;
 import my.groudId.quarkussocial.domain.model.User;
 import my.groudId.quarkussocial.rest.dto.CreateUserRequest;
+import my.groudId.quarkussocial.rest.dto.ResponseError;
 
 import javax.inject.Inject;
 import javax.transaction.Transactional;
+import javax.validation.ConstraintViolation;
+import javax.validation.Validator;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.Set;
 
 @Path("/users")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -18,24 +22,36 @@ import javax.ws.rs.core.Response;
 public class UserResource {
 
     private  UserRepository repository;
+    private Validator validator;
 
     @Inject
-    public UserResource(UserRepository repository){
+    public UserResource(UserRepository repository, Validator validator){
         this.repository = repository;
+        this.validator = validator;
     }
 
     @POST
     @Transactional
     public Response createUser(CreateUserRequest  userRequest ){
+
+        Set<ConstraintViolation<CreateUserRequest>> violations = validator.validate(userRequest);
+        if(!violations.isEmpty()){
+            return ResponseError
+                    .createFromValidation(violations)
+                    .withStatusCode(ResponseError.UNPROCESSABLE_ENTITY_STATUS);
+        }
+
         User user = new User();
         user.setAge(userRequest.getAge());
         user.setAge(userRequest.getAge());
         user.setName(userRequest.getName());
 
-        System.out.print(user);
         repository.persist(user);
 
-        return Response.ok(user).build();
+        return Response.status(Response
+                .Status.CREATED.getStatusCode())
+                .entity(user)
+                .build();
     }
 
     @GET
@@ -52,7 +68,7 @@ public class UserResource {
 
         if(user != null){
             repository.delete(user);
-            return  Response.ok().build();
+            return  Response.noContent().build();
         }
         return Response.status(Response.Status.NOT_FOUND).build();
     }
@@ -66,7 +82,7 @@ public class UserResource {
         if(user != null){
             user.setAge(userData.getAge());
             user.setName(userData.getName());
-            return Response.ok().build();
+            return Response.noContent().build();
         }
         return Response.status(Response.Status.NOT_FOUND).build();
     }
